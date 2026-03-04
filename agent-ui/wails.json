@@ -1,0 +1,19 @@
+{
+  "name": "agent-ui",
+  "outputfilename": "agent-manager",
+  "assetdir": "./frontend/dist",
+  "wailsjsdir": "./frontend/src",
+  "frontend:dir": "./frontend",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "reloadOnAssetsChange": true,
+  "version": "2",
+  "info": {
+    "productName": "Agent Manager",
+    "productVersion": "1.0.0",
+    "productIdentifier": "com.poc.agent-manager",
+    "copyright": "© 2025 Unified E2E POC"
+  }
+}

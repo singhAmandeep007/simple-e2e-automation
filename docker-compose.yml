@@ -1,0 +1,140 @@
+# =============================================================================
+#  Unified E2E POC — Docker Compose
+# =============================================================================
+#  Profiles:
+#    (none)      → core: control-plane + web-ui
+#    agent       → adds the go-agent service
+#    e2e         → adds the Cypress test runner
+#    full        → control-plane + web-ui + agent + e2e
+#
+#  Single-command local run:
+#    docker compose up --build
+#
+#  Run e2e tests:
+#    docker compose --profile e2e up --build --exit-code-from e2e
+#
+#  Full CI pipeline:
+#    docker compose --profile agent --profile e2e up --build --exit-code-from e2e
+# =============================================================================
+
+services:
+  # ── Control Plane ────────────────────────────────────────────────────────────
+  control-plane:
+    build:
+      context: ./control-plane
+      dockerfile: Dockerfile
+    container_name: poc-control-plane
+    ports:
+      - "${CP_PORT:-4000}:4000"
+    volumes:
+      - cp-data:/app/data # persistent SQLite DB
+    environment:
+      - TZ=UTC
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - poc-network
+
+  # ── Web UI ───────────────────────────────────────────────────────────────────
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+      args:
+        # In Docker, API calls go through nginx proxy at /api
+        VITE_API_URL: /api
+    container_name: poc-web-ui
+    ports:
+      - "${UI_PORT:-5173}:80"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/nginx-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - poc-network
+
+  # ── Agent ─────────────────────────────────────────────────────────────────────
+  # Start with: docker compose --profile agent up
+  agent:
+    profiles: ["agent", "full"]
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: poc-agent
+    command:
+      - "start"
+      - "--id"
+      - "${AGENT_ID:-docker-agent-001}"
+      - "--cp-url"
+      - "ws://control-plane:4000/ws"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    volumes:
+      - scan-source:/scan-source # mount a directory for scanning
+    environment:
+      - AGENT_ID=${AGENT_ID:-docker-agent-001}
+    restart: unless-stopped
+    networks:
+      - poc-network
+
+  # ── E2E Cypress Tests ─────────────────────────────────────────────────────────
+  # Run with: docker compose --profile e2e up --build --exit-code-from e2e
+  e2e:
+    profiles: ["e2e", "full"]
+    build:
+      context: . # project root (needs agent/ source for go-agent build)
+      dockerfile: e2e/Dockerfile
+    container_name: poc-e2e
+    depends_on:
+      control-plane:
+        condition: service_healthy
+      web-ui:
+        condition: service_healthy
+    volumes:
+      - cp-data:/cp-data:ro # shared volume → direct DB assertions
+      - /tmp:/tmp # fixture generation on host /tmp
+    environment:
+      # Override Cypress defaults for Docker network
+      - CYPRESS_baseUrl=http://web-ui:80
+      - CYPRESS_CP_URL=http://control-plane:4000
+      - CYPRESS_CP_WS_URL=ws://control-plane:4000/ws
+      # Override cy.task paths for Docker
+      - CYPRESS_DB_PATH=/cp-data/data.db
+      - CYPRESS_AGENT_BIN=/usr/local/bin/go-agent
+      # CI-friendly: no interactive display
+      - ELECTRON_ENABLE_LOGGING=1
+      - DISPLAY=
+    networks:
+      - poc-network
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  cp-data:
+    driver: local
+    labels:
+      poc.component: "control-plane"
+      poc.description: "Persistent SQLite database"
+
+  scan-source:
+    driver: local
+    labels:
+      poc.component: "agent"
+      poc.description: "Source directory for agent scans"
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  poc-network:
+    driver: bridge
+    labels:
+      poc.description: "Internal network for all POC services"

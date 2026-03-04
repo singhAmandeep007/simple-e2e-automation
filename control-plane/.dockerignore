@@ -1,0 +1,26 @@
+# Go build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*_test.go
+
+# Go build cache
+vendor/
+
+# SQLite database
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Compiled binaries
+/bin/
+
+# Logs
+*.log

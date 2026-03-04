@@ -1,0 +1,39 @@
+# Binaries (built locally)
+bin/
+
+# Go build artifacts
+*.test
+*.out
+
+# Node
+node_modules/
+web-ui/node_modules/
+e2e/node_modules/
+agent-ui/frontend/node_modules/
+
+# Build output
+web-ui/dist/
+agent-ui/frontend/dist/
+
+# SQLite database
+control-plane/data/
+*.db
+
+# Env / secrets
+.env
+**/.env
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Cypress artifacts
+e2e/cypress/screenshots/
+e2e/cypress/videos/
+e2e/cypress/results/
+
+# Logs
+*.log

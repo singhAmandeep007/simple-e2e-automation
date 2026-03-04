@@ -1,0 +1,30 @@
+{
+  "name": "unified-e2e-poc",
+  "version": "1.0.0",
+  "description": "Unified E2E Automation POC — scan flow with Go agent, control plane, Wails agent-ui, web UI, and Cypress",
+  "private": true,
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "install:all": "npm install && npm install --prefix web-ui && npm install --prefix e2e && npm install --prefix agent-ui/frontend",
+    "build:agent": "cd agent && go build -o ../bin/go-agent .",
+    "build:cp": "cd control-plane && go build -o ../bin/control-plane .",
+    "build:go": "npm-run-all build:agent build:cp",
+    "start:cp": "cd control-plane && ../bin/control-plane",
+    "start:ui": "npm run dev --prefix web-ui",
+    "start:all": "concurrently --names 'CP,UI' --prefix-colors 'cyan,magenta' 'cd control-plane && ../bin/control-plane' 'npm run dev --prefix web-ui'",
+    "e2e": "npm run --prefix e2e cy:run",
+    "e2e:scan": "npm run --prefix e2e cy:run:scan",
+    "e2e:smoke": "npm run --prefix e2e cy:run:smoke",
+    "e2e:agent": "npm run --prefix e2e cy:run:agent",
+    "e2e:open": "npm run --prefix e2e cy:open",
+    "ci:setup": "bash scripts/setup.sh",
+    "ci": "npm run build:go && npm run install:all && npm run --prefix e2e cy:ci",
+    "clean": "rm -rf bin/go-agent bin/control-plane web-ui/dist control-plane/data"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "npm-run-all": "^4.1.5"
+  }
+}

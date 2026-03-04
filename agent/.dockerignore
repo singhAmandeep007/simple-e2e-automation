@@ -1,0 +1,6 @@
+# Go build artifacts
+vendor/
+bin/
+
+# Local config overrides
+*.log
