@@ -13,24 +13,24 @@ The project is composed of four distinct applications running in concert:
 
 ```mermaid
 graph TD
-    subgraph "Admin / User"
-        WU[Web UI (React/Vite)]
+    subgraph Admin
+        WU["Web UI (React/Vite)"]
     end
-    
-    subgraph "Core Cloud"
-        CP[Control Plane (Go/Gin/WS)]
-        DB[(SQLite DB\n'data.db')]
+
+    subgraph Cloud
+        CP["Control Plane (Go/Gin/WS)"]
+        DB[("SQLite DB")]
         CP -->|Reads/Writes| DB
     end
-    
-    subgraph "Remote Worker (Mac/Linux/Windows)"
-        AUI[Agent Desktop UI\n(Wails v2)]
-        ACLI[Agent CLI\n(Go Binary)]
+
+    subgraph "Remote Worker"
+        AUI["Agent Desktop UI (Wails v2)"]
+        ACLI["Agent CLI (Go Binary)"]
         AUI -->|Spawns & Monitors| ACLI
     end
 
-    WU <-->|REST API\nhttp://localhost:4000| CP
-    ACLI <-->|WebSocket\nws://localhost:4000/ws| CP
+    WU <-->|REST API| CP
+    ACLI <-->|WebSocket| CP
 ```
 
 ## 🔄 Scan Execution Flow
