@@ -1,16 +1,15 @@
+// Package scan provides directory scanning via the native Go filepath.WalkDir.
+// It produces a structured list of all files and subdirectories under a given root path,
+// reporting progress periodically without blocking the caller.
 package scan
 
 import (
-	"encoding/json"
-	"fmt"
 	"io/fs"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 )
 
-// Entry mirrors the rclone lsjson output format.
+// Entry mirrors the expected JSON output format for directory items.
 type Entry struct {
 	Path    string `json:"path"`
 	IsDir   bool   `json:"isDir"`
@@ -28,73 +27,18 @@ type Result struct {
 // ProgressFunc is called periodically during scanning.
 type ProgressFunc func(filesScanned int)
 
-// Scanner performs directory scanning via rclone (if available) or native Go walker.
-type Scanner struct {
-	rcloneBin string // path to rclone binary; empty means native walker
-}
+// Scanner performs directory scanning via the native Go walker.
+// This abstract struct ensures the Control Plane receives consistent JSON structures.
+type Scanner struct{}
 
-func New(rcloneBin string) *Scanner {
-	return &Scanner{rcloneBin: rcloneBin}
+// New constructs a Scanner using the standard library dir walker.
+func New() *Scanner {
+	return &Scanner{}
 }
 
 // Scan scans the given sourcePath and returns all entries.
-// onProgress is called after each directory batch (approx every 100ms).
+// onProgress is called periodically (approx every 200ms) without blocking.
 func (s *Scanner) Scan(sourcePath string, onProgress ProgressFunc) (*Result, error) {
-	if s.rcloneBin != "" {
-		if _, err := os.Stat(s.rcloneBin); err == nil {
-			return s.rcloneScan(sourcePath, onProgress)
-		}
-	}
-	// Fallback to native Go walker
-	return s.nativeScan(sourcePath, onProgress)
-}
-
-// rcloneScan uses `rclone lsjson --recursive` to scan.
-func (s *Scanner) rcloneScan(sourcePath string, onProgress ProgressFunc) (*Result, error) {
-	cmd := exec.Command(s.rcloneBin, "lsjson", sourcePath, "--recursive", "--no-modtime=false")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("rclone lsjson: %w", err)
-	}
-
-	type rcloneEntry struct {
-		Path    string `json:"Path"`
-		Name    string `json:"Name"`
-		IsDir   bool   `json:"IsDir"`
-		Size    int64  `json:"Size"`
-		ModTime string `json:"ModTime"`
-	}
-	var raw []rcloneEntry
-	if err := json.Unmarshal(out, &raw); err != nil {
-		return nil, fmt.Errorf("parsing rclone output: %w", err)
-	}
-
-	result := &Result{}
-	for i, r := range raw {
-		entry := Entry{
-			Path:    r.Path,
-			IsDir:   r.IsDir,
-			Size:    r.Size,
-			ModTime: r.ModTime,
-		}
-		result.Entries = append(result.Entries, entry)
-		if r.IsDir {
-			result.TotalFolders++
-		} else {
-			result.TotalFiles++
-		}
-		if onProgress != nil && i%20 == 0 {
-			onProgress(result.TotalFiles)
-		}
-	}
-	if onProgress != nil {
-		onProgress(result.TotalFiles)
-	}
-	return result, nil
-}
-
-// nativeScan uses filepath.WalkDir as rclone fallback.
-func (s *Scanner) nativeScan(sourcePath string, onProgress ProgressFunc) (*Result, error) {
 	result := &Result{}
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()

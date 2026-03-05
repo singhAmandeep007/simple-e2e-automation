@@ -1,3 +1,6 @@
+// Package main is the entry point for the Wails desktop application.
+// It acts as a wrapper GUI around the `go-agent` CLI binary, persisting configuration
+// locally and providing start/stop lifecycle management visible in the OS tray.
 package main
 
 import (
@@ -204,7 +207,7 @@ func (a *App) scanLog(r io.Reader) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
-		fmt.Println(line) // echo to app terminal
+		log.Printf("[agent-cli] %s\n", line) // echo to app terminal
 
 		if line != "" {
 			a.mu.Lock()

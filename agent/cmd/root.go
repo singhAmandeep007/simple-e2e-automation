@@ -62,7 +62,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	log.Printf("[agent] starting with id=%s cp=%s", cfg.Agent.ID, cfg.ControlPlane.WSURL)
 
-	scanner := scan.New(cfg.Rclone.BinPath)
+	scanner := scan.New()
 
 	// onRunScan is called by the WS client whenever control plane sends RUN_SCAN
 	var wsClient *agentWS.Client

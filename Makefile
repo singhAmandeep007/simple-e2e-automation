@@ -35,7 +35,7 @@ RESET  := \033[0m
 help: ## Show this help message
 	@printf "\n$(CYAN)Unified E2E POC — Available Commands$(RESET)\n\n"
 	@printf "$(YELLOW)LOCAL (no Docker)$(RESET)\n"
-	@printf "  make setup           — one-time setup (downloads rclone, builds Go, installs npm)\n"
+	@printf "  make setup           — one-time setup (builds Go binaries, installs npm deps)\n"
 	@printf "  make build-go        — build Go binaries → ./bin/\n"
 	@printf "  make up              — start control-plane + web-ui locally\n"
 	@printf "  make agent           — start agent locally (set AGENT_ID=xyz)\n"
@@ -168,17 +168,33 @@ e2e-docker-smoke: ## Run @smoke tests in Docker
 	CYPRESS_grep="@smoke" $(MAKE) e2e-docker
 
 # ── Full CI Pipeline ──────────────────────────────────────────────────────────
+define wait_for_port
+	@printf "$(CYAN)Waiting for port $(1)...$(RESET)\n"; \
+	for i in $$(seq 1 30); do \
+		if nc -z 127.0.0.1 $(1) 2>/dev/null; then \
+			printf "$(GREEN)✅ Port $(1) ready ($$i s)$(RESET)\n"; break; \
+		fi; \
+		[ $$i -eq 30 ] && printf "$(RED)❌ Port $(1) not ready after 30s$(RESET)\n" && exit 1; \
+		sleep 1; \
+	done
+endef
+
 ci: build-go ## Local CI: build Go + npm install + run e2e
 	@printf "$(CYAN)Running local CI pipeline...$(RESET)\n"
 	@bash scripts/clean.sh
 	npm run install:all
-	(cd control-plane && ../bin/control-plane &) && \
-	  npm run dev --prefix web-ui & \
-	  sleep 5 && \
-	  npm run e2e; \
-	  EXIT=$$?; \
-	  pkill go-agent 2>/dev/null; pkill -f "vite" 2>/dev/null; \
-	  exit $$EXIT
+	@printf "$(CYAN)Starting Control Plane...$(RESET)\n"
+	(cd control-plane && ../bin/control-plane > /tmp/cp-ci.log 2>&1) &
+	$(call wait_for_port,4000)
+	@printf "$(CYAN)Starting Web UI...$(RESET)\n"
+	npm run dev --prefix web-ui > /tmp/ui-ci.log 2>&1 &
+	$(call wait_for_port,5173)
+	@printf "$(GREEN)✅ Both services ready — running E2E tests...$(RESET)\n"
+	npm run e2e; \
+	EXIT=$$?; \
+	pkill -f "bin/control-plane" 2>/dev/null || true; \
+	pkill -f "vite" 2>/dev/null || true; \
+	exit $$EXIT
 
 ci-docker: ## Docker CI: full pipeline — build images → start services → run e2e → clean up
 	@printf "$(CYAN)Running full Docker CI pipeline...$(RESET)\n"

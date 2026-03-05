@@ -13,15 +13,18 @@ import (
 	"control-plane/internal/ws"
 )
 
+// ScanHandler handles REST operations on the /scans and /agents/:id/scan resources.
 type ScanHandler struct {
 	db  *db.DB
 	hub *ws.Hub
 }
 
+// NewScanHandler constructs a ScanHandler with the given database and WS hub.
 func NewScanHandler(database *db.DB, hub *ws.Hub) *ScanHandler {
 	return &ScanHandler{db: database, hub: hub}
 }
 
+// Scan is the REST response shape for a scan record.
 type Scan struct {
 	ID           string `json:"id"`
 	AgentID      string `json:"agentId"`
@@ -34,6 +37,7 @@ type Scan struct {
 	UpdatedAt    string `json:"updatedAt"`
 }
 
+// TreeNode is a single file/directory entry returned by GET /scans/:id/tree.
 type TreeNode struct {
 	Path    string `json:"path"`
 	IsDir   bool   `json:"isDir"`

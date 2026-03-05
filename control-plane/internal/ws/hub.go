@@ -1,3 +1,5 @@
+// Package ws contains the WebSocket Hub and connection handler for the Control Plane.
+// The Hub keeps a registry of active agent connections and routes messages to them.
 package ws
 
 import (
@@ -13,6 +15,7 @@ type Hub struct {
 	agents map[string]*websocket.Conn // agentId → conn
 }
 
+// NewHub constructs a Hub with an empty agent registry.
 func NewHub() *Hub {
 	return &Hub{
 		agents: make(map[string]*websocket.Conn),
@@ -69,7 +72,7 @@ func (h *Hub) ConnectedAgents() []string {
 	return ids
 }
 
-// errors
+// ErrAgentNotConnected is returned by SendToAgent when the target agent has no live connection.
 var ErrAgentNotConnected = &hubError{"agent not connected"}
 
 type hubError struct{ msg string }

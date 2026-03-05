@@ -7,6 +7,16 @@ const STATUS_MAP = {
   connecting: { color: "#f59e0b", label: "Connecting" },
 };
 
+/**
+ * AgentStatusBadge renders a pill-shaped indicator showing the live connection status
+ * and general health of an Agent connected via WebSockets to the Control Plane.
+ *
+ * @param {Object} props
+ * @param {string} props.status - The agent status ("online" | "offline" | "connecting")
+ * @param {boolean=} props.connected - The raw TCP underlying WebSocket state
+ * @param {Object=} props.style - Optional CSS overrides
+ * @returns {JSX.Element}
+ */
 export default function AgentStatusBadge({ status }) {
   const s = STATUS_MAP[status] || STATUS_MAP.offline;
   return (

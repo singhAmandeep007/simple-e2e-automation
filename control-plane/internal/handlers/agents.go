@@ -1,3 +1,6 @@
+// Package handlers implements the HTTP REST handlers for the Control Plane API.
+// Each handler struct aggregates its dependencies (database, WebSocket hub) and
+// exposes route-level methods that are registered on the Gin router.
 package handlers
 
 import (
@@ -21,11 +24,13 @@ type Agent struct {
 	Connected bool   `json:"connected"`
 }
 
+// AgentHandler handles REST operations on the /agents resource.
 type AgentHandler struct {
 	db  *db.DB
 	hub *ws.Hub
 }
 
+// NewAgentHandler constructs an AgentHandler with the given database and WS hub.
 func NewAgentHandler(database *db.DB, hub *ws.Hub) *AgentHandler {
 	return &AgentHandler{db: database, hub: hub}
 }

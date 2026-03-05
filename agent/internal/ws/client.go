@@ -1,3 +1,6 @@
+// Package ws implements the WebSocket client used by the agent to communicate
+// with the Control Plane. It handles connection, reconnection with exponential
+// backoff, heartbeats, and scan command dispatching.
 package ws
 
 import (
@@ -11,13 +14,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Message envelope
+// Message is the generic WebSocket envelope used by both agent and control plane.
 type Message struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data,omitempty"`
 }
 
-// RunScanPayload is received from control plane
+// RunScanPayload is the body of a RUN_SCAN command received from the control plane.
 type RunScanPayload struct {
 	ScanID     string `json:"scanId"`
 	SourcePath string `json:"sourcePath"`
@@ -25,14 +28,15 @@ type RunScanPayload struct {
 
 // Client manages the WebSocket connection to the control plane.
 type Client struct {
-	agentID      string
-	wsURL        string
-	mu           sync.Mutex
-	conn         *websocket.Conn
-	onRunScan    func(scanID, sourcePath string)
-	reconnecting bool
+	agentID   string
+	wsURL     string
+	mu        sync.Mutex
+	conn      *websocket.Conn
+	onRunScan func(scanID, sourcePath string)
 }
 
+// NewClient constructs a Client with the given agent ID, control plane WebSocket URL,
+// and a callback invoked whenever a RUN_SCAN command is received.
 func NewClient(agentID, wsURL string, onRunScan func(scanID, sourcePath string)) *Client {
 	return &Client{
 		agentID:   agentID,
@@ -63,7 +67,7 @@ func (c *Client) Connect() {
 		log.Printf("[ws] connected")
 
 		// Register with control plane
-		c.send(Message{
+		_ = c.send(Message{
 			Type: "REGISTER",
 			Data: mustMarshal(map[string]string{"agentId": c.agentID}),
 		})
@@ -86,7 +90,7 @@ func (c *Client) Connect() {
 
 // SendScanProgress sends a SCAN_PROGRESS message.
 func (c *Client) SendScanProgress(scanID string, filesScanned int) {
-	c.send(Message{
+	_ = c.send(Message{
 		Type: "SCAN_PROGRESS",
 		Data: mustMarshal(map[string]any{"scanId": scanID, "filesScanned": filesScanned}),
 	})
@@ -94,7 +98,7 @@ func (c *Client) SendScanProgress(scanID string, filesScanned int) {
 
 // SendScanComplete sends a SCAN_COMPLETE message with the full tree.
 func (c *Client) SendScanComplete(scanID string, stats, tree any) {
-	c.send(Message{
+	_ = c.send(Message{
 		Type: "SCAN_COMPLETE",
 		Data: mustMarshal(map[string]any{
 			"scanId": scanID,
@@ -106,7 +110,7 @@ func (c *Client) SendScanComplete(scanID string, stats, tree any) {
 
 // SendScanFailed sends a SCAN_FAILED message.
 func (c *Client) SendScanFailed(scanID, errMsg string) {
-	c.send(Message{
+	_ = c.send(Message{
 		Type: "SCAN_FAILED",
 		Data: mustMarshal(map[string]any{"scanId": scanID, "error": errMsg}),
 	})

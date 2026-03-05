@@ -1,9 +1,10 @@
+// Package server configures the Gin HTTP handler and core WebSocket upgrader
+// that constitute the Control Plane API layer.
 package server
 
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -14,6 +15,8 @@ import (
 	ws "control-plane/internal/ws"
 )
 
+// Server aggregates the shared dependencies (Config, Database, WebSocket Hub)
+// and handles routing of all API endpoints and WebSocket upgrade requests.
 type Server struct {
 	cfg      *config.Config
 	db       *db.DB
@@ -37,13 +40,19 @@ func (s *Server) Run() error {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
-	// CORS middleware
+	// CORS middleware — reflects the request Origin if it is in the allowlist.
+	// Browsers require exactly one matching origin in the response header.
+	allowedOrigins := make(map[string]bool, len(s.cfg.CORS.AllowOrigins))
+	for _, o := range s.cfg.CORS.AllowOrigins {
+		allowedOrigins[o] = true
+	}
 	r.Use(func(c *gin.Context) {
-		allowOrigins := strings.Join(s.cfg.CORS.AllowOrigins, ", ")
-		if allowOrigins == "" {
-			allowOrigins = "*"
+		origin := c.Request.Header.Get("Origin")
+		if allowedOrigins[origin] {
+			c.Header("Access-Control-Allow-Origin", origin)
+		} else if len(s.cfg.CORS.AllowOrigins) == 0 {
+			c.Header("Access-Control-Allow-Origin", "*")
 		}
-		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == http.MethodOptions {

@@ -1,3 +1,5 @@
+// Package config provides YAML-based configuration loading for the Control Plane.
+// All top-level fields have sane defaults applied when omitted from the config file.
 package config
 
 import (
@@ -7,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Config is the root configuration structure for the Control Plane.
 type Config struct {
 	Server ServerConfig `yaml:"server"`
 	DB     DBConfig     `yaml:"db"`
@@ -14,23 +17,28 @@ type Config struct {
 	Log    LogConfig    `yaml:"log"`
 }
 
+// ServerConfig sets the HTTP listener host and port.
 type ServerConfig struct {
 	Port int    `yaml:"port"`
 	Host string `yaml:"host"`
 }
 
+// DBConfig specifies the filesystem path to the SQLite database file.
 type DBConfig struct {
 	Path string `yaml:"path"`
 }
 
+// CORSConfig holds allowed origins for cross-origin HTTP requests.
 type CORSConfig struct {
 	AllowOrigins []string `yaml:"allow_origins"`
 }
 
+// LogConfig controls application log verbosity.
 type LogConfig struct {
 	Level string `yaml:"level"`
 }
 
+// Load reads the YAML config file at the given path and applies defaults.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

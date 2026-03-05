@@ -1,3 +1,6 @@
+// Package ws contains the WebSocket protocol handler for the Control Plane.
+// It processes inbound agent messages (REGISTER, SCAN_PROGRESS, SCAN_COMPLETE, SCAN_FAILED)
+// and updates shared database state accordingly.
 package ws
 
 import (
@@ -12,38 +15,43 @@ import (
 	"control-plane/internal/db"
 )
 
-// Message is a generic WebSocket message envelope.
+// Message is a generic WebSocket message envelope sent between agent and control plane.
 type Message struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data,omitempty"`
 }
 
-// Incoming message payloads from agent
+// RegisterPayload is the body of a REGISTER message sent by an agent on connect.
 type RegisterPayload struct {
 	AgentID string `json:"agentId"`
 }
 
+// ScanProgressPayload carries incremental scan progress updates.
 type ScanProgressPayload struct {
 	ScanID       string `json:"scanId"`
 	FilesScanned int    `json:"filesScanned"`
 }
 
+// ScanCompletePayload is sent when an agent finishes scanning a directory tree.
 type ScanCompletePayload struct {
 	ScanID string      `json:"scanId"`
 	Stats  ScanStats   `json:"stats"`
 	Tree   []TreeEntry `json:"tree"`
 }
 
+// ScanFailedPayload is sent when a scan errors out on the agent side.
 type ScanFailedPayload struct {
 	ScanID string `json:"scanId"`
 	Error  string `json:"error"`
 }
 
+// ScanStats holds aggregate statistics for a completed scan.
 type ScanStats struct {
 	TotalFiles   int `json:"totalFiles"`
 	TotalFolders int `json:"totalFolders"`
 }
 
+// TreeEntry is a single file or directory entry in a scan result tree.
 type TreeEntry struct {
 	Path    string `json:"path"`
 	IsDir   bool   `json:"isDir"`
@@ -91,7 +99,7 @@ func HandleConnection(conn *websocket.Conn, hub *Hub, database *db.DB) {
 				log.Printf("[ws] failed to set agent online: %v", err)
 			}
 			resp, _ := json.Marshal(Message{Type: "REGISTERED", Data: mustMarshal(map[string]string{"agentId": agentID})})
-			conn.WriteMessage(websocket.TextMessage, resp)
+			_ = conn.WriteMessage(websocket.TextMessage, resp)
 
 		case "HEARTBEAT":
 			// Keep connection alive — no-op for now
@@ -191,5 +199,5 @@ func mustMarshal(v any) json.RawMessage {
 	return b
 }
 
-// Ensure sql.ErrNoRows is accessible via import
+// Ensure sql.ErrNoRows is accessible via import (used in handlers package)
 var _ = sql.ErrNoRows

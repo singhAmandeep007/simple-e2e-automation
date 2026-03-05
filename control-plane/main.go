@@ -1,3 +1,6 @@
+// Package main acts as the entry point for the Control Plane binary.
+// It initializes the configuration, connects to the SQLite database,
+// constructs the HTTP/WebSocket server, and begins listening for connections.
 package main
 
 import (

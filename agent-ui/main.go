@@ -1,3 +1,4 @@
+// Package main handles Wails v2 lifecycle initialization and GUI rendering.
 package main
 
 import (

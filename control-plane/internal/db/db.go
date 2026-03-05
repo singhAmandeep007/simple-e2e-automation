@@ -1,3 +1,6 @@
+// Package db manages the SQLite database connection for the Control Plane.
+// It applies schema migrations on startup and exposes a thin wrapper around
+// the standard library sql.DB for dependency injection.
 package db
 
 import (
@@ -43,4 +46,9 @@ func Init(path string) (*DB, error) {
 	}
 
 	return &DB{sqldb}, nil
+}
+
+// Close closes the underlying database connection.
+func (d *DB) Close() error {
+	return d.DB.Close()
 }

@@ -10,7 +10,6 @@ import (
 type Config struct {
 	Agent        AgentConfig        `yaml:"agent"`
 	ControlPlane ControlPlaneConfig `yaml:"control_plane"`
-	Rclone       RcloneConfig       `yaml:"rclone"`
 	Log          LogConfig          `yaml:"log"`
 }
 
@@ -21,10 +20,6 @@ type AgentConfig struct {
 
 type ControlPlaneConfig struct {
 	WSURL string `yaml:"ws_url"`
-}
-
-type RcloneConfig struct {
-	BinPath string `yaml:"bin_path"`
 }
 
 type LogConfig struct {

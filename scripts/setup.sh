@@ -21,29 +21,6 @@ fi
 GO_VERSION=$(go version | awk '{print $3}')
 echo "✅ Go: $GO_VERSION"
 
-# ── Download rclone locally to ./bin ─────────────────────────────────────────
-RCLONE_BIN="$BIN/rclone"
-if [ ! -f "$RCLONE_BIN" ]; then
-  echo "⬇️  Downloading rclone binary to ./bin/rclone ..."
-  OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-  ARCH=$(uname -m)
-  if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi
-  if [ "$ARCH" = "arm64" ]; then ARCH="arm64"; fi
-
-  RCLONE_VERSION="v1.68.2"
-  RCLONE_URL="https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-${OS}-${ARCH}.zip"
-  TMP_DIR=$(mktemp -d)
-
-  curl -fsSL "$RCLONE_URL" -o "$TMP_DIR/rclone.zip"
-  unzip -q "$TMP_DIR/rclone.zip" -d "$TMP_DIR"
-  cp "$TMP_DIR/rclone-${RCLONE_VERSION}-${OS}-${ARCH}/rclone" "$RCLONE_BIN"
-  chmod +x "$RCLONE_BIN"
-  rm -rf "$TMP_DIR"
-  echo "✅ rclone installed to ./bin/rclone"
-else
-  echo "✅ rclone already at ./bin/rclone"
-fi
-
 # ── Build Go binaries into ./bin ─────────────────────────────────────────────
 echo "🔨 Building agent → ./bin/go-agent ..."
 (cd "$ROOT/agent" && go mod download && go build -o "$BIN/go-agent" .)

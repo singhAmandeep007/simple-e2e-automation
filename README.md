@@ -1,154 +1,109 @@
 # Unified E2E Automation POC
 
-> **Full-stack e2e automation** — Cypress browser tests interacting with a real Go agent, Go control plane, SQLite database, and React web UI, all wired together via `cy.task`.
+Welcome to the **Unified E2E Automation** proof-of-concept repository. This monorepo demonstrates a robust, asynchronous agent-based architecture designed for distributed file scanning and management, fully integrated with a deep Cypress end-to-end testing suite.
 
----
+## 🏗️ System Architecture
 
-## Architecture
+The project is composed of four distinct applications running in concert:
 
+1. **Control Plane (`control-plane/`)**: The central Go backend providing REST APIs for the Web UI and a WebSocket hub for remote Agents. Built with `gin` and a pure-Go SQLite database (`modernc.org/sqlite`).
+2. **Agent CLI (`agent/`)**: A headless Go binary deployed to remote machines. Connects to the Control Plane via WebSockets, executes local file scans (using the native Go directory walker), and streams progress payloads back.
+3. **Agent Desktop UI (`agent-ui/`)**: A Wails v2 + React desktop application acting as a user-friendly wrapper around the headless Agent CLI. It manages configuration, spawns the local binary, and parsers its logs to display live WebSocket connection status.
+4. **Web UI (`web-ui/`)**: A React + Vite frontend dashboard for centralized management. Users can register new agents, view connection statuses, trigger remote scans, and explore the nested results in real time.
+
+```mermaid
+graph TD
+    subgraph "Admin / User"
+        WU[Web UI (React/Vite)]
+    end
+    
+    subgraph "Core Cloud"
+        CP[Control Plane (Go/Gin/WS)]
+        DB[(SQLite DB\n'data.db')]
+        CP -->|Reads/Writes| DB
+    end
+    
+    subgraph "Remote Worker (Mac/Linux/Windows)"
+        AUI[Agent Desktop UI\n(Wails v2)]
+        ACLI[Agent CLI\n(Go Binary)]
+        AUI -->|Spawns & Monitors| ACLI
+    end
+
+    WU <-->|REST API\nhttp://localhost:4000| CP
+    ACLI <-->|WebSocket\nws://localhost:4000/ws| CP
 ```
-Cypress (browser)
-   │  cy.task           REST / polling
-   │  ──────────────── Web UI (React :5173)
-   │                        │
-   │  cy.task spawns        │ REST + WebSocket
-   ▼                        ▼
-Go Agent CLI ──WS──▶ Control Plane (Go :4000)
-(rclone/walk)             │ SQLite data.db
-                          ▼
-                    cy.task queryDb → direct DB assertions
+
+## 🔄 Scan Execution Flow
+
+To ensure maximum performance without blocking HTTP threads, remote scans are executed over an asynchronous WebSocket event loop. 
+
+```mermaid
+sequenceDiagram
+    participant WebUI as Web UI
+    participant CP as Control Plane (Go)
+    participant Agent as Agent CLI (Go)
+
+    WebUI->>CP: POST /agents/:id/scan (sourcePath)
+    CP->>DB: Insert Scan config (status: 'pending')
+    CP-->>WebUI: 202 Accepted (scanId)
+    
+    CP-)Agent: [WS] RUN_SCAN (scanId, sourcePath)
+    Note over Agent: Starts directory walker
+    
+    loop Every 200ms
+        Agent-)CP: [WS] SCAN_PROGRESS (filesScanned)
+        CP->>DB: Update 'scans' table
+    end
+    
+    Note over Agent: Walk complete
+    Agent-)CP: [WS] SCAN_COMPLETE (stats, fullTree)
+    CP->>DB: Update status 'success', Insert rows to 'scan_tree'
+    
+    WebUI->>CP: GET /scans/:id (Polling)
+    CP-->>WebUI: 200 OK (status: 'success')
 ```
 
----
+## 🚀 Getting Started
 
-## What's Inside
+The entire stack is container-less for raw execution speed. All compiled binaries are scoped to the local `./bin/` directory.
 
-| Directory | Language | Purpose |
-|---|---|---|
-| `agent/` | Go | CLI agent: connects to CP via WS, runs rclone scans |
-| `control-plane/` | Go | REST API + WebSocket server + SQLite state |
-| `agent-ui/` | Go + Wails v2 + React | Desktop app to manage & start the agent |
-| `web-ui/` | React + Vite | Browser UI for creating agents and running scans |
-| `e2e/` | Cypress 13 + Node | Unified e2e automation suite |
-| `bin/` | — | Compiled Go binaries (generated, not committed) |
+### Prerequisites
+- Go 1.22+
+- Node 20+
+- Wails CLI v2 (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`)
 
----
+### 1. Build & Setup
+Run the setup script once to install NPM dependencies and build the Go binaries.
+```bash
+make setup
+```
 
-## Prerequisites
+### 2. Start the Infrastructure
+This compiles the Go apps and boots both the **Control Plane** API and the **Web UI** dashboard.
+```bash
+make up
+```
 
-| Tool | Version | Notes |
-|---|---|---|
-| Go | 1.22+ | `go version` |
-| Node.js | 20.11.0 | Via nvm: `nvm use` |
-| rclone | any | Downloaded to `./bin/` by setup script |
+### 3. Launch the Agent
+You can start the agent via its Desktop application, or directly from the CLI on a separate terminal:
+```bash
+cd agent-ui
+make dev
+# -- OR --
+./bin/go-agent start --id "my-test-mac" --cp-url ws://localhost:4000/ws
+```
 
----
+## 🧪 E2E Test Suite (Cypress)
 
-## Quick Start
-
-### 1. Setup (one-time)
+This repository includes a sophisticated Cypress 13 end-to-end framework capable of verifying both the React DOM and the underlying Go binaries in parallel.
 
 ```bash
-# Installs node deps + builds Go binaries + downloads rclone to ./bin/
-bash scripts/setup.sh
+make e2e       # Run the whole suite heedlessly
+make e2e-open  # Open the interactive Cypress runner
+make ci        # Re-compile everything, clean the DB, and run e2e 100% fresh
 ```
 
-### 2. Start services
+### 🧠 Pure Test Isolation
+To guarantee deterministic tests, the E2E suite bypasses standard APIs and connects **directly to the SQLite database**. Included in `cypress.config.js` is a `cleanDb()` Node task that runs globally *before every spec suite*. 
 
-```bash
-npm run start:all
-# Control Plane → http://localhost:4000
-# Web UI        → http://localhost:5173
-```
-
-### 3. Start the agent (in a new terminal)
-
-```bash
-# Option A: Agent Manager desktop app (Wails)
-cd agent-ui && go run github.com/wailsapp/wails/v2/cmd/wails@v2.9.2 dev
-
-# Option B: Agent CLI directly
-bin/go-agent start --id my-agent-001 --cp-url ws://localhost:4000/ws
-```
-
-### 4. Run E2E tests
-
-```bash
-# All tests (headless)
-npm run e2e
-
-# Only scan tests
-npm run e2e:scan        # --env grep=@scan
-
-# Only smoke tests
-npm run e2e:smoke       # --env grep=@smoke
-
-# Open Cypress UI (interactive)
-npm run e2e:open
-```
-
----
-
-## Test Tags
-
-| Tag | Description |
-|---|---|
-| `@agent` | Agent create + connect/disconnect lifecycle |
-| `@scan` | Full scan flow (UI + API + DB assertions) |
-| `@smoke` | Critical path: scan success + DB row count |
-
-Run by tag: `cd e2e && npx cypress run --env grep=@smoke`
-
----
-
-## The Scan Flow (POC scope)
-
-```
-1. User creates agent on Web UI → stored in SQLite agents table
-2. Agent binary starts → WebSocket connection to Control Plane
-3. Agent status → "online" (DB + UI polling)
-4. User triggers Scan from Web UI with a source path
-5. Control Plane sends RUN_SCAN to agent via WS
-6. Agent runs rclone lsjson (or Go native walker) on the path
-7. Agent streams SCAN_PROGRESS → Control Plane → DB update
-8. Agent sends SCAN_COMPLETE with full tree → DB stores scan_tree rows
-9. UI polls GET /scans/:id → shows "success" badge
-10. User browses the scan tree at /scans/:id/tree
-```
-
----
-
-## Configuration Files
-
-Each component has its own `config.yaml`:
-
-| File | Port/Config |
-|---|---|
-| `control-plane/config.yaml` | Port 4000, SQLite path |
-| `agent/config.yaml` | Control plane WS URL, rclone binary path |
-| `agent-ui/` | Stored in `~/.config/unified-e2e-poc/agent-ui.yaml` |
-
----
-
-## CI (Jenkins)
-
-```bash
-# The Jenkinsfile handles:
-# 1. go build → ./bin/
-# 2. npm install
-# 3. Start control-plane + web-ui in background
-# 4. cypress run → JUnit results
-# 5. Kill all background processes in post{}
-```
-
-JUnit results are published from `e2e/cypress/results/*.xml`.
-
----
-
-## Project Decisions
-
-- **SQLite (no Docker)** — zero external dependencies for state. `control-plane/data/data.db` is auto-created on startup.
-- **Pure Go SQLite** (`modernc.org/sqlite`) — no CGO, no C toolchain required.
-- **rclone with Go fallback** — `agent/internal/scan/scanner.go` uses rclone if `./bin/rclone` exists, otherwise falls back to `filepath.WalkDir`.
-- **Polling for Web UI** — AgentList polls every 3s, ScanProgress every 1.5s — simple and reliable without WS complexity in the browser.
-- **cy.task as the bridge** — Node.js process inside Cypress handles agent spawn/kill, fixture generation, and direct DB assertions. This is what makes it truly "unified".
+This task physically truncates the `agents`, `scans`, and `scan_tree` SQL tables—ensuring every E2E suite initializes against a blank slate without cross-test contamination.

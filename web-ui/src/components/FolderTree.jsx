@@ -81,6 +81,14 @@ function formatSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
+/**
+ * FolderTree renders a collapsible, deeply nested directory structure from a
+ * flat array of file paths returned by the Go backend scan.
+ *
+ * @param {Object} props
+ * @param {Array<{path: string, isDir: boolean, size: number, modTime: string}>} props.nodes - Flat array from SQLite `scan_tree`
+ * @returns {JSX.Element}
+ */
 export default function FolderTree({ nodes }) {
   const tree = buildTree(nodes);
   const children = Object.values(tree.children);

@@ -34,7 +34,35 @@ module.exports = defineConfig({
       require("@cypress/grep/src/plugin")(config);
 
       on("task", {
-        // ── Agent lifecycle ─────────────────────────────────────────────────
+        // ── Pre-flight ────────────────────────────────────────────────────────
+        /**
+         * Verify that the Control Plane API is reachable.
+         * Throws with a helpful message if not.
+         */
+        async checkServicesReady() {
+          const http = require("http");
+          const CP_URL = config.env.CP_URL || "http://localhost:4000";
+          const url = `${CP_URL}/agents`;
+          return new Promise((resolve, reject) => {
+            const req = http.get(url, (res) => {
+              resolve(`Control Plane reachable at ${CP_URL} (status ${res.statusCode})`);
+            });
+            req.on("error", () => {
+              reject(
+                new Error(
+                  `\n\n❌ Control Plane is NOT reachable at ${CP_URL}.\n` +
+                    `   Please start services first: make up\n` +
+                    `   Then open Cypress: make e2e-open\n`
+                )
+              );
+            });
+            req.setTimeout(3000, () => {
+              req.destroy();
+              reject(new Error(`Timeout connecting to ${CP_URL}`));
+            });
+          });
+        },
+
         /**
          * Spawn the go-agent binary and return the pid.
          * @param {{ agentId: string, cpUrl?: string, configDir?: string }} opts
